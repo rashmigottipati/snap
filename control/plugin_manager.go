@@ -26,7 +26,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -315,17 +314,37 @@ func (p *pluginManager) LoadPlugin(details *pluginDetails, emitter gomit.Emitter
 	lPlugin.Details = details
 	lPlugin.State = DetectedState
 
+	fileName := filepath.Base(lPlugin.Details.Exec[0])
+	//fullPath := lPlugin.Details.ExecPath
+
 	pmLogger.WithFields(log.Fields{
 		"_block": "load-plugin",
-		"path":   filepath.Base(lPlugin.Details.Exec[0]),
+		"path":   fileName,
 	}).Info("plugin load called")
+
+	// file, err := os.Open(path.Join(fullPath, fileName))
+	// if err != nil {
+	// 	return nil, serror.New(err)
+	// }
+	// defer file.Close()
+
+	// info, err := file.Stat()
+	// size := info.Size()
+	// bytes := make([]byte, size)
+
+	// buffer := bufio.NewReader(file)
+	// _, err = buffer.Read(bytes)
+
+	// fileName, err = fileutils.WriteFile(fileName, GetDefaultConfig().TempDirPath, bytes)
+
 	// We will create commands by appending the ExecPath to the actual command.
 	// The ExecPath is a temporary location where the plugin/package will be
 	// run from.
 	commands := make([]string, len(lPlugin.Details.Exec))
 	for i, e := range lPlugin.Details.Exec {
-		commands[i] = path.Join(lPlugin.Details.ExecPath, e)
+		commands[i] = filepath.Join(lPlugin.Details.ExecPath, e)
 	}
+
 	ePlugin, err := plugin.NewExecutablePlugin(
 		p.GenerateArgs(int(log.GetLevel())),
 		commands...)
@@ -580,31 +599,28 @@ func (p *pluginManager) UnloadPlugin(pl core.Plugin) (*loadedPlugin, serror.Snap
 	// aka, was not auto loaded from auto_discover_path
 	// nor loaded from tests
 	// then do clean up
-	if !plugin.Details.IsAutoLoaded {
+	pmLogger.WithFields(log.Fields{
+		"plugin-type":    plugin.TypeName(),
+		"plugin-name":    plugin.Name(),
+		"plugin-version": plugin.Version(),
+		"plugin-path":    plugin.Details.Path,
+	}).Debugf("Removing plugin")
+	if err := os.RemoveAll(filepath.Dir(plugin.Details.Path)); err != nil {
 		pmLogger.WithFields(log.Fields{
 			"plugin-type":    plugin.TypeName(),
 			"plugin-name":    plugin.Name(),
 			"plugin-version": plugin.Version(),
 			"plugin-path":    plugin.Details.Path,
-		}).Debugf("Removing plugin")
-		if err := os.RemoveAll(filepath.Dir(plugin.Details.Path)); err != nil {
-			pmLogger.WithFields(log.Fields{
-				"plugin-type":    plugin.TypeName(),
-				"plugin-name":    plugin.Name(),
-				"plugin-version": plugin.Version(),
-				"plugin-path":    plugin.Details.Path,
-			}).Error(err)
-			se := serror.New(err)
-			se.SetFields(map[string]interface{}{
-				"plugin-type":    plugin.TypeName(),
-				"plugin-name":    plugin.Name(),
-				"plugin-version": plugin.Version(),
-				"plugin-path":    plugin.Details.Path,
-			})
-			return nil, se
-		}
+		}).Error(err)
+		se := serror.New(err)
+		se.SetFields(map[string]interface{}{
+			"plugin-type":    plugin.TypeName(),
+			"plugin-name":    plugin.Name(),
+			"plugin-version": plugin.Version(),
+			"plugin-path":    plugin.Details.Path,
+		})
+		return nil, se
 	}
-
 	p.loadedPlugins.remove(plugin.Key())
 
 	// Remove any metrics from the catalog if this was a collector

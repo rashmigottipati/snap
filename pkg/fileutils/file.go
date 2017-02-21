@@ -1,4 +1,4 @@
-package common
+package fileutils
 
 import (
 	"io/ioutil"
@@ -7,17 +7,17 @@ import (
 	"runtime"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/intelsdi-x/snap/control"
 )
 
-func WriteFile(filename string, b []byte) (string, error) {
+// TODO add doc string
+func WriteFile(fileName, filePath string, b []byte) (string, error) {
 	// Create temporary directory
-	dir, err := ioutil.TempDir(control.GetDefaultConfig().TempDirPath, "snap-plugin-")
+	dir, err := ioutil.TempDir(filePath, "snap-plugin-")
 	if err != nil {
 		return "", err
 	}
 
-	f, err := os.Create(path.Join(dir, filename))
+	f, err := os.Create(path.Join(dir, fileName))
 	if err != nil {
 		return "", err
 	}

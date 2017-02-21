@@ -27,13 +27,12 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/smartystreets/goconvey/convey"
-
 	"github.com/intelsdi-x/snap/control/fixtures"
 	"github.com/intelsdi-x/snap/control/plugin"
 	"github.com/intelsdi-x/snap/core"
 	"github.com/intelsdi-x/snap/core/ctypes"
 	"github.com/intelsdi-x/snap/core/serror"
+	. "github.com/smartystreets/goconvey/convey"
 )
 
 func TestLoadedPlugins(t *testing.T) {
@@ -77,6 +76,7 @@ func loadPlugin(p *pluginManager, path string) (*loadedPlugin, serror.SnapError)
 		Exec:         []string{filepath.Base(path)},
 		IsAutoLoaded: true,
 	}
+
 	for i := 0; i < 3; i++ {
 		lp, e = p.LoadPlugin(details, nil)
 		if e == nil {

@@ -20,6 +20,7 @@ limitations under the License.
 package control
 
 import (
+	"bufio"
 	"crypto/sha256"
 	"errors"
 	"fmt"
@@ -47,6 +48,7 @@ import (
 	"github.com/intelsdi-x/snap/core/serror"
 	"github.com/intelsdi-x/snap/grpc/controlproxy/rpc"
 	"github.com/intelsdi-x/snap/pkg/aci"
+	"github.com/intelsdi-x/snap/pkg/fileutils"
 	"github.com/intelsdi-x/snap/pkg/psigning"
 )
 
@@ -391,7 +393,23 @@ func (p *pluginControl) Start() error {
 						}).Warn("Auto-loading of plugin '", fileName, "' skipped (plugin not executable)")
 						continue
 					}
-					rp, err := core.NewRequestedPlugin(path.Join(fullPath, fileName))
+
+					file, err := os.Open(path.Join(fullPath, fileName))
+					if err != nil {
+						return err
+					}
+					defer file.Close()
+
+					info, err := file.Stat()
+					size := info.Size()
+					bytes := make([]byte, size)
+
+					buffer := bufio.NewReader(file)
+					_, err = buffer.Read(bytes)
+
+					fileName, err := fileutils.WriteFile(fileName, GetDefaultConfig().TempDirPath, bytes)
+					rp, err := core.NewRequestedPlugin(fileName)
+
 					if err != nil {
 						controlLogger.WithFields(log.Fields{
 							"_block":           "start",
@@ -1064,6 +1082,10 @@ func (p *pluginControl) SetAutodiscoverPaths(paths []string) {
 
 func (p *pluginControl) GetAutodiscoverPaths() []string {
 	return p.autodiscoverPaths
+}
+
+func (p *pluginControl) GetTempDir() string {
+	return p.Config.TempDirPath
 }
 
 func (p *pluginControl) SetPluginTrustLevel(trust int) {
