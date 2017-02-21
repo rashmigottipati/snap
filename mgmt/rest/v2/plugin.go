@@ -37,7 +37,7 @@ import (
 	"github.com/intelsdi-x/snap/control"
 	"github.com/intelsdi-x/snap/core"
 	"github.com/intelsdi-x/snap/core/serror"
-	"github.com/intelsdi-x/snap/mgmt/rest/common"
+	"github.com/intelsdi-x/snap/pkg/fileutils"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -144,7 +144,7 @@ func (s *apiV2) loadPlugin(w http.ResponseWriter, r *http.Request, _ httprouter.
 					Write(400, FromError(e), w)
 					return
 				}
-				if pluginPath, err = common.WriteFile(p.FileName(), b); err != nil {
+				if pluginPath, err = fileutils.WriteFile(p.FileName(), s.metricManager.GetTempDir(), b); err != nil {
 					Write(500, FromError(err), w)
 					return
 				}

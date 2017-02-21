@@ -37,8 +37,8 @@ import (
 	"github.com/intelsdi-x/snap/core"
 	"github.com/intelsdi-x/snap/core/serror"
 	"github.com/intelsdi-x/snap/mgmt/rest/api"
-	"github.com/intelsdi-x/snap/mgmt/rest/common"
 	"github.com/intelsdi-x/snap/mgmt/rest/v1/rbody"
+	"github.com/intelsdi-x/snap/pkg/fileutils"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -126,7 +126,7 @@ func (s *apiV1) loadPlugin(w http.ResponseWriter, r *http.Request, _ httprouter.
 					rbody.Write(500, rbody.FromError(e), w)
 					return
 				}
-				if pluginPath, err = common.WriteFile(p.FileName(), b); err != nil {
+				if pluginPath, err = fileutils.WriteFile(p.FileName(), s.metricManager.GetTempDir(), b); err != nil {
 					rbody.Write(500, rbody.FromError(err), w)
 					return
 				}
@@ -151,7 +151,7 @@ func (s *apiV1) loadPlugin(w http.ResponseWriter, r *http.Request, _ httprouter.
 			rbody.Write(500, rbody.FromError(err), w)
 			return
 		}
-		rp.SetAutoLoaded(false)
+		//rp.SetAutoLoaded(false)
 		// Sanity check, verify the checkSum on the file sent is the same
 		// as after it is written to disk.
 		if rp.CheckSum() != checkSum {

@@ -1,5 +1,4 @@
 // +build legacy
-
 /*
 http://www.apache.org/licenses/LICENSE-2.0.txt
 
@@ -22,11 +21,14 @@ limitations under the License.
 package control
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"math/rand"
 	"net"
+	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -46,6 +48,7 @@ import (
 	"github.com/intelsdi-x/snap/core/control_event"
 	"github.com/intelsdi-x/snap/core/ctypes"
 	"github.com/intelsdi-x/snap/core/serror"
+	"github.com/intelsdi-x/snap/pkg/fileutils"
 	"github.com/intelsdi-x/snap/plugin/helper"
 )
 
@@ -94,7 +97,26 @@ func load(c *pluginControl, paths ...string) (core.CatalogedPlugin, serror.SnapE
 	// 3 times before letting the error through. Hopefully this cuts down on the number of Travis failures
 	var e serror.SnapError
 	var p core.CatalogedPlugin
-	rp, err := core.NewRequestedPlugin(paths[0])
+
+	//create file in os.TempDir() and provide the path to new requested plugin
+	fileName := filepath.Base(paths[0])
+	fullPath := filepath.Dir(paths[0])
+	file, err := os.Open(path.Join(fullPath, fileName))
+	if err != nil {
+		return nil, serror.New(err)
+	}
+	defer file.Close()
+
+	info, err := file.Stat()
+	size := info.Size()
+	bytes := make([]byte, size)
+
+	buffer := bufio.NewReader(file)
+	_, err = buffer.Read(bytes)
+
+	file1, err := fileutils.WriteFile(fileName, GetDefaultConfig().TempDirPath, bytes)
+	rp, err := core.NewRequestedPlugin(file1)
+	//rp, err := core.NewRequestedPlugin(paths[0])
 	if err != nil {
 		return nil, serror.New(err)
 	}
