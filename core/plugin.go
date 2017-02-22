@@ -20,13 +20,17 @@ limitations under the License.
 package core
 
 import (
+	"bufio"
 	"crypto/sha256"
 	"fmt"
 	"io/ioutil"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/intelsdi-x/snap/control/plugin/cpolicy"
 	"github.com/intelsdi-x/snap/core/cdata"
+	"github.com/intelsdi-x/snap/pkg/fileutils"
 )
 
 type Plugin interface {
@@ -101,14 +105,52 @@ type RequestedPlugin struct {
 	autoLoaded bool
 }
 
-func NewRequestedPlugin(path string) (*RequestedPlugin, error) {
+func NewRequestedPlugin(path, tmp string) (*RequestedPlugin, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	info, err := file.Stat()
+	if err != nil {
+		return nil, nil
+	}
+	size := info.Size()
+	bytes := make([]byte, size)
+	buffer := bufio.NewReader(file)
+	_, err = buffer.Read(bytes)
+	if err != nil {
+		return nil, nil
+	}
+	tempFile, err := fileutils.WriteFile(filepath.Base(path), tmp, bytes)
+	if err != nil {
+		return nil, nil
+	}
 	rp := &RequestedPlugin{
-		path:       path,
+		path:       tempFile,
 		signature:  nil,
 		autoLoaded: true,
 	}
-	err := rp.generateCheckSum()
+	genErr := rp.generateCheckSum()
+	if genErr != nil {
+		return nil, err
+	}
+	return rp, nil
+}
+
+func NewRequestedPluginBytes(path string, tmp string, b []byte) (*RequestedPlugin, error) {
+	tmpFile, err := fileutils.WriteFile(filepath.Base(path), tmp, b)
 	if err != nil {
+		return nil, nil
+	}
+	rp := &RequestedPlugin{
+		path:       tmpFile,
+		signature:  nil,
+		autoLoaded: true,
+	}
+	genErr := rp.generateCheckSum()
+	if genErr != nil {
 		return nil, err
 	}
 	return rp, nil
