@@ -83,10 +83,8 @@ func loadPlugin(p *pluginManager, fileName string) (*loadedPlugin, serror.SnapEr
 	if err != nil {
 		return nil, serror.New(err)
 	}
-
 	size := info.Size()
 	bytes := make([]byte, size)
-
 	buffer := bufio.NewReader(file)
 	_, err = buffer.Read(bytes)
 	if err != nil {

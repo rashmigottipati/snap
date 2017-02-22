@@ -38,7 +38,6 @@ import (
 	"github.com/intelsdi-x/snap/core/serror"
 	"github.com/intelsdi-x/snap/mgmt/rest/api"
 	"github.com/intelsdi-x/snap/mgmt/rest/v1/rbody"
-	"github.com/intelsdi-x/snap/pkg/fileutils"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -68,13 +67,13 @@ func (p *plugin) TypeName() string {
 }
 
 func (s *apiV1) loadPlugin(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	var rp *core.RequestedPlugin
 	mediaType, params, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	if err != nil {
 		rbody.Write(500, rbody.FromError(err), w)
 		return
 	}
 	if strings.HasPrefix(mediaType, "multipart/") {
-		var pluginPath string
 		var signature []byte
 		var checkSum [sha256.Size]byte
 		lp := &rbody.PluginsLoaded{}
@@ -126,7 +125,8 @@ func (s *apiV1) loadPlugin(w http.ResponseWriter, r *http.Request, _ httprouter.
 					rbody.Write(500, rbody.FromError(e), w)
 					return
 				}
-				if pluginPath, err = fileutils.WriteFile(p.FileName(), s.metricManager.GetTempDir(), b); err != nil {
+				//if pluginPath, err = fileutils.WriteFile(p.FileName(), s.metricManager.GetTempDir(), b); err != nil {
+				if rp, err = core.NewRequestedPluginBytes(p.FileName(), s.metricManager.GetTempDir(), b); err != nil {
 					rbody.Write(500, rbody.FromError(err), w)
 					return
 				}
@@ -146,7 +146,7 @@ func (s *apiV1) loadPlugin(w http.ResponseWriter, r *http.Request, _ httprouter.
 			}
 			i++
 		}
-		rp, err := core.NewRequestedPlugin(pluginPath)
+		//rp, err := core.NewRequestedPlugin(pluginPath)
 		if err != nil {
 			rbody.Write(500, rbody.FromError(err), w)
 			return

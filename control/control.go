@@ -391,7 +391,7 @@ func (p *pluginControl) Start() error {
 						}).Warn("Auto-loading of plugin '", fileName, "' skipped (plugin not executable)")
 						continue
 					}
-					rp, err := core.NewRequestedPlugin(path.Join(fullPath, fileName))
+					rp, err := core.NewRequestedPlugin(path.Join(fullPath, fileName), GetDefaultConfig().TempDirPath)
 					if err != nil {
 						controlLogger.WithFields(log.Fields{
 							"_block":           "start",

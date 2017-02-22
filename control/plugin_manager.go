@@ -22,12 +22,10 @@ limitations under the License.
 package control
 
 import (
-	"bufio"
 	"crypto/sha256"
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -45,7 +43,6 @@ import (
 	"github.com/intelsdi-x/snap/core"
 	"github.com/intelsdi-x/snap/core/cdata"
 	"github.com/intelsdi-x/snap/core/serror"
-	"github.com/intelsdi-x/snap/pkg/fileutils"
 )
 
 const (
@@ -317,43 +314,17 @@ func (p *pluginManager) LoadPlugin(details *pluginDetails, emitter gomit.Emitter
 	lPlugin.Details = details
 	lPlugin.State = DetectedState
 
-	fileName := filepath.Base(lPlugin.Details.Exec[0])
-	fullPath := lPlugin.Details.ExecPath
-
 	pmLogger.WithFields(log.Fields{
 		"_block": "load-plugin",
-		"path":   fileName,
+		"path":   filepath.Base(lPlugin.Details.Exec[0]),
 	}).Info("plugin load called")
 
-	file, err := os.Open(path.Join(fullPath, fileName))
-	if err != nil {
-		return nil, serror.New(err)
-	}
-	defer file.Close()
-
-	info, err := file.Stat()
-	if err != nil {
-		return nil, serror.New(err)
-	}
-	size := info.Size()
-	bytes := make([]byte, size)
-
-	buffer := bufio.NewReader(file)
-	_, err = buffer.Read(bytes)
-	if err != nil {
-		return nil, serror.New(err)
-	}
-
-	tempFile, err := fileutils.WriteFile(fileName, GetDefaultConfig().TempDirPath, bytes)
-	if err != nil {
-		return nil, serror.New(err)
-	}
 	// We will create commands by appending the ExecPath to the actual command.
 	// The ExecPath is a temporary location where the plugin/package will be
 	// run from.
 	commands := make([]string, len(lPlugin.Details.Exec))
-	for i := range lPlugin.Details.Exec {
-		commands[i] = tempFile
+	for i, e := range lPlugin.Details.Exec {
+		commands[i] = filepath.Join(lPlugin.Details.ExecPath, e)
 	}
 
 	ePlugin, err := plugin.NewExecutablePlugin(

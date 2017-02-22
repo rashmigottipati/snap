@@ -1709,8 +1709,8 @@ func TestMetricSubscriptionToNewVersion(t *testing.T) {
 		c.eventManager.RegisterHandler("TestMetricSubscriptionToNewVersion", lpe)
 		c.Start()
 		_, err := load(c, helper.PluginFilePath("snap-plugin-collector-mock1"))
-		<-lpe.load
 		So(err, ShouldBeNil)
+		<-lpe.load
 		So(len(c.pluginManager.all()), ShouldEqual, 1)
 		lp, err2 := c.pluginManager.get("collector" + core.Separator + "mock" + core.Separator + "1")
 		So(err2, ShouldBeNil)
@@ -1784,8 +1784,8 @@ func TestMetricSubscriptionToOlderVersion(t *testing.T) {
 		c.eventManager.RegisterHandler("TestMetricSubscriptionToOlderVersion", lpe)
 		c.Start()
 		_, err := load(c, helper.PluginFilePath("snap-plugin-collector-mock2"))
-		<-lpe.load
 		So(err, ShouldBeNil)
+		<-lpe.load
 		So(len(c.pluginManager.all()), ShouldEqual, 1)
 		lp, err2 := c.pluginManager.get("collector" + core.Separator + "mock" + core.Separator + "2")
 		So(err2, ShouldBeNil)
