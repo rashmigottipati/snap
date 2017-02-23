@@ -32,7 +32,6 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/intelsdi-x/snap/control"
 	"github.com/intelsdi-x/snap/core"
 	"github.com/intelsdi-x/snap/core/serror"
 	"github.com/intelsdi-x/snap/mgmt/rest/client"
@@ -71,6 +70,8 @@ var (
 		TaskRemovedType: "Removed",
 	}
 )
+
+var TempPath = os.TempDir()
 
 type PluginRequestType int
 
@@ -331,7 +332,7 @@ func (w worker) loadPlugin(plugin core.Plugin) error {
 			logger.Error(err)
 			continue
 		}
-		rp, err := core.NewRequestedPlugin(f.Name(), control.GetDefaultConfig().TempDirPath)
+		rp, err := core.NewRequestedPlugin(f.Name(), TempPath)
 		if err != nil {
 			logger.Error(err)
 			return err

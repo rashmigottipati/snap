@@ -48,7 +48,7 @@ func TestFilePublisherLoad(t *testing.T) {
 		Convey("ensure plugin loads and responds", func() {
 			c := control.New(control.GetDefaultConfig())
 			c.Start()
-			rp, _ := core.NewRequestedPlugin(PluginPath)
+			rp, _ := core.NewRequestedPlugin(PluginPath, c.GetTempDir())
 			_, err := c.Load(rp)
 
 			So(err, ShouldBeNil)

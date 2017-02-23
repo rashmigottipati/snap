@@ -48,9 +48,10 @@ func TestMockPluginLoad(t *testing.T) {
 		Convey("ensure plugin loads and responds", func() {
 			c := control.New(control.GetDefaultConfig())
 			c.Start()
-			rp, _ := core.NewRequestedPlugin(PluginPath)
-			_, err := c.Load(rp)
+			rp, err := core.NewRequestedPlugin(PluginPath, c.GetTempDir())
+			So(err, ShouldBeNil)
 
+			_, err = c.Load(rp)
 			So(err, ShouldBeNil)
 		})
 

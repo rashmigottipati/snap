@@ -114,18 +114,18 @@ func NewRequestedPlugin(path, tmp string) (*RequestedPlugin, error) {
 
 	info, err := file.Stat()
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 	size := info.Size()
 	bytes := make([]byte, size)
 	buffer := bufio.NewReader(file)
 	_, err = buffer.Read(bytes)
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 	tempFile, err := fileutils.WriteFile(filepath.Base(path), tmp, bytes)
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 	rp := &RequestedPlugin{
 		path:       tempFile,

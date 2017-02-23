@@ -21,14 +21,11 @@ limitations under the License.
 package control
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"math/rand"
 	"net"
-	"os"
 	"path"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -48,7 +45,6 @@ import (
 	"github.com/intelsdi-x/snap/core/control_event"
 	"github.com/intelsdi-x/snap/core/ctypes"
 	"github.com/intelsdi-x/snap/core/serror"
-	"github.com/intelsdi-x/snap/pkg/fileutils"
 	"github.com/intelsdi-x/snap/plugin/helper"
 )
 
@@ -98,37 +94,10 @@ func load(c *pluginControl, paths ...string) (core.CatalogedPlugin, serror.SnapE
 	var e serror.SnapError
 	var p core.CatalogedPlugin
 
-	//create file in os.TempDir() and provide the path to new requested plugin
-	fileName := filepath.Base(paths[0])
-	fullPath := filepath.Dir(paths[0])
-	file, err := os.Open(path.Join(fullPath, fileName))
+	rp, err := core.NewRequestedPlugin(paths[0], GetDefaultConfig().TempDirPath)
 	if err != nil {
 		return nil, serror.New(err)
 	}
-	defer file.Close()
-
-	info, err := file.Stat()
-	if err != nil {
-		return nil, serror.New(err)
-	}
-	size := info.Size()
-	bytes := make([]byte, size)
-
-	buffer := bufio.NewReader(file)
-	_, err = buffer.Read(bytes)
-	if err != nil {
-		return nil, serror.New(err)
-	}
-
-	file1, err := fileutils.WriteFile(fileName, GetDefaultConfig().TempDirPath, bytes)
-	if err != nil {
-		return nil, serror.New(err)
-	}
-	rp, err := core.NewRequestedPlugin(file1)
-	if err != nil {
-		return nil, serror.New(err)
-	}
-	//rp, err := core.NewRequestedPlugin(paths[0])
 	if len(paths) > 1 {
 		rp.SetSignature([]byte{00, 00, 00})
 	}
@@ -187,7 +156,6 @@ func TestPluginControlGenerateArgs(t *testing.T) {
 }
 
 func TestSwapPlugin(t *testing.T) {
-	t.SkipNow()
 	// These tests only work if SNAP_PATH is known.
 	// It is the responsibility of the testing framework to
 	// build the plugins first into the build dir.
@@ -223,7 +191,7 @@ func TestSwapPlugin(t *testing.T) {
 			})
 		})
 
-		mockRP, mErr := core.NewRequestedPlugin(fixtures.PluginPathMock1)
+		mockRP, mErr := core.NewRequestedPlugin(fixtures.PluginPathMock1, GetDefaultConfig().TempDirPath)
 		Convey("Requested collector plugin should not error", func() {
 			So(mErr, ShouldBeNil)
 		})
@@ -267,7 +235,7 @@ func TestSwapPlugin(t *testing.T) {
 		Convey("Swap plugin with a different type of plugin", func() {
 			filePath := helper.PluginFilePath("snap-plugin-publisher-mock-file")
 			So(filePath, ShouldNotBeEmpty)
-			fileRP, pErr := core.NewRequestedPlugin(fixtures.PluginPathMock1)
+			fileRP, pErr := core.NewRequestedPlugin(fixtures.PluginPathMock1, GetDefaultConfig().TempDirPath)
 			Convey("Requested publisher plugin should not error", func() {
 				So(pErr, ShouldBeNil)
 				Convey("Swapping collector and publisher plugins", func() {
@@ -290,7 +258,7 @@ func TestSwapPlugin(t *testing.T) {
 			pm.ExistingPlugin = lp
 			c.pluginManager = pm
 
-			mockRP, mErr := core.NewRequestedPlugin(fixtures.PluginPathMock1)
+			mockRP, mErr := core.NewRequestedPlugin(fixtures.PluginPathMock1, GetDefaultConfig().TempDirPath)
 			So(mErr, ShouldBeNil)
 			err := c.SwapPlugins(mockRP, lp)
 			Convey("So err should be received if rollback fails", func() {

@@ -577,10 +577,6 @@ func (p *pluginManager) UnloadPlugin(pl core.Plugin) (*loadedPlugin, serror.Snap
 		return nil, se
 	}
 
-	// If the plugin has been uploaded via REST API
-	// aka, was not auto loaded from auto_discover_path
-	// nor loaded from tests
-	// then do clean up
 	pmLogger.WithFields(log.Fields{
 		"plugin-type":    plugin.TypeName(),
 		"plugin-name":    plugin.Name(),
