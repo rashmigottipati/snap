@@ -143,7 +143,6 @@ func (s *apiV2) loadPlugin(w http.ResponseWriter, r *http.Request, _ httprouter.
 					Write(400, FromError(e), w)
 					return
 				}
-				//if pluginPath, err = fileutils.WriteFile(p.FileName(), s.metricManager.GetTempDir(), b); err != nil {
 				if rp, err = core.NewRequestedPluginBytes(p.FileName(), s.metricManager.GetTempDir(), b); err != nil {
 					Write(500, FromError(err), w)
 					return
@@ -164,7 +163,6 @@ func (s *apiV2) loadPlugin(w http.ResponseWriter, r *http.Request, _ httprouter.
 			}
 			i++
 		}
-		//rp, err := core.NewRequestedPlugin(pluginPath)
 		if err != nil {
 			Write(500, FromError(err), w)
 			return

@@ -9,7 +9,6 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
-// TODO add doc string
 func WriteFile(fileName, filePath string, b []byte) (string, error) {
 	// Create temporary directory
 	dir, err := ioutil.TempDir(filePath, "snap-plugin-")

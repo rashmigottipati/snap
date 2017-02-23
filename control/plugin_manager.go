@@ -156,15 +156,14 @@ func (l *loadedPlugins) findLatest(typeName, name string) (*loadedPlugin, error)
 
 // the struct representing a plugin that is loaded into snap
 type pluginDetails struct {
-	CheckSum     [sha256.Size]byte
-	Exec         []string
-	ExecPath     string
-	IsPackage    bool
-	IsAutoLoaded bool
-	Manifest     *schema.ImageManifest
-	Path         string
-	Signed       bool
-	Signature    []byte
+	CheckSum  [sha256.Size]byte
+	Exec      []string
+	ExecPath  string
+	IsPackage bool
+	Manifest  *schema.ImageManifest
+	Path      string
+	Signed    bool
+	Signature []byte
 }
 
 type loadedPlugin struct {
@@ -577,10 +576,6 @@ func (p *pluginManager) UnloadPlugin(pl core.Plugin) (*loadedPlugin, serror.Snap
 		return nil, se
 	}
 
-	// If the plugin has been uploaded via REST API
-	// aka, was not auto loaded from auto_discover_path
-	// nor loaded from tests
-	// then do clean up
 	pmLogger.WithFields(log.Fields{
 		"plugin-type":    plugin.TypeName(),
 		"plugin-name":    plugin.Name(),
