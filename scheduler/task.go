@@ -275,8 +275,17 @@ func (t *task) stream() {
 			t.maxMetricsBuffer)
 		if err != nil {
 			consecutiveFailures++
-			e := checkTaskFailures(t, consecutiveFailures)
-			if e != nil {
+			// check task failures
+			if t.stopOnFailure >= 0 && consecutiveFailures >= t.stopOnFailure {
+				taskLogger.WithFields(log.Fields{
+					"_block":               "stream",
+					"task-id":              t.id,
+					"task-name":            t.name,
+					"consecutive failures": consecutiveFailures,
+					"error":                t.lastFailureMessage,
+				}).Error(ErrTaskDisabledOnFailures)
+				// disable the task
+				t.disable(t.lastFailureMessage)
 				return
 			}
 			// If we are unsuccessful at setting up the stream
@@ -321,8 +330,17 @@ func (t *task) stream() {
 					time.Sleep(resetTime)
 					done = true
 				}
-				e := checkTaskFailures(t, consecutiveFailures)
-				if e != nil {
+				// check task failures
+				if t.stopOnFailure >= 0 && consecutiveFailures >= t.stopOnFailure {
+					taskLogger.WithFields(log.Fields{
+						"_block":               "stream",
+						"task-id":              t.id,
+						"task-name":            t.name,
+						"consecutive failures": consecutiveFailures,
+						"error":                t.lastFailureMessage,
+					}).Error(ErrTaskDisabledOnFailures)
+					// disable the task
+					t.disable(t.lastFailureMessage)
 					return
 				}
 			}
@@ -330,28 +348,6 @@ func (t *task) stream() {
 	}
 }
 
-func checkTaskFailures(t *task, consecutiveFailures int) error {
-	if t.stopOnFailure >= 0 && consecutiveFailures >= t.stopOnFailure {
-		taskLogger.WithFields(log.Fields{
-			"_block":               "spin",
-			"task-id":              t.id,
-			"task-name":            t.name,
-			"consecutive failures": consecutiveFailures,
-			"error":                t.lastFailureMessage,
-		}).Error(ErrTaskDisabledOnFailures)
-		// You must lock on state change for tasks
-		t.Lock()
-		t.state = core.TaskDisabled
-		t.Unlock()
-		// Send task disabled event
-		event := new(scheduler_event.TaskDisabledEvent)
-		event.TaskID = t.id
-		event.Why = fmt.Sprintf("Task disabled with error: %s", t.lastFailureMessage)
-		defer t.eventEmitter.Emit(event)
-		return ErrTaskDisabledOnFailures
-	}
-	return nil
-}
 func (t *task) Stop() {
 	t.Lock()
 	defer t.Unlock()
@@ -363,6 +359,13 @@ func (t *task) Stop() {
 
 // UnsubscribePlugins groups task dependencies by the node they live in workflow and unsubscribe them
 func (t *task) UnsubscribePlugins() []serror.SnapError {
+	taskLogger.WithFields(log.Fields{
+		"_block":     "unsubscribePlugins",
+		"task-id":    t.id,
+		"task-name":  t.name,
+		"task-state": t.state,
+	}).Debug("Unsubscribe task dependencies")
+
 	depGroups := getWorkflowPlugins(t.workflow.processNodes, t.workflow.publishNodes, t.workflow.metrics)
 	var errs []serror.SnapError
 	for k := range depGroups {
@@ -375,6 +378,14 @@ func (t *task) UnsubscribePlugins() []serror.SnapError {
 				errs = append(errs, uerrs...)
 			}
 		}
+	}
+	for _, err := range errs {
+		taskLogger.WithFields(log.Fields{
+			"_block":     "UnsubscribePlugins",
+			"task-id":    t.id,
+			"task-name":  t.name,
+			"task-state": t.state,
+		}).Error(err)
 	}
 	return errs
 }
@@ -484,36 +495,23 @@ func (t *task) spin() {
 						"consecutive failures": consecutiveFailures,
 						"error":                t.lastFailureMessage,
 					}).Error(ErrTaskDisabledOnFailures)
-					// You must lock on state change for tasks
-					t.Lock()
-					t.state = core.TaskDisabled
-					t.Unlock()
-					// Send task disabled event
-					event := new(scheduler_event.TaskDisabledEvent)
-					event.TaskID = t.id
-					event.Why = fmt.Sprintf("Task disabled with error: %s", t.lastFailureMessage)
-					defer t.eventEmitter.Emit(event)
+
+					// disable the task
+					t.disable(t.lastFailureMessage)
 					return
 				}
 
 			// Schedule has ended
 			case schedule.Ended:
-				// You must lock task to change state
-				t.Lock()
-				t.state = core.TaskEnded
-				t.Unlock()
-				// Send task ended event
-				event := new(scheduler_event.TaskEndedEvent)
-				event.TaskID = t.id
-				defer t.eventEmitter.Emit(event)
+				// end the task
+				t.end()
 				return //spin
 
 			// Schedule has errored
 			case schedule.Error:
-				// You must lock task to change state
-				t.Lock()
-				t.state = core.TaskDisabled
-				t.Unlock()
+				// disable the task
+				reason := sr.Error().Error()
+				t.disable(reason)
 				return //spin
 
 			}
@@ -535,6 +533,37 @@ func (t *task) fire() {
 	t.state = core.TaskFiring
 	t.workflow.Start(t)
 	t.state = core.TaskSpinning
+}
+
+// disable proceeds disabling a task which consists of changing task state to disabled, emitting an appropriate event
+// and unsubscribing its dependencies
+func (t *task) disable(failureMsg string) {
+	t.Lock()
+	t.state = core.TaskDisabled
+	t.Unlock()
+
+	// Send task disabled event
+	event := new(scheduler_event.TaskDisabledEvent)
+	event.TaskID = t.id
+	event.Why = fmt.Sprintf("Task disabled with error: %s", failureMsg)
+	defer t.eventEmitter.Emit(event)
+
+	// We need to unsubscribe from deps when a task has disabled
+	t.UnsubscribePlugins()
+}
+
+// end proceeds ending a task which consists of changing task state to ended, emitting an appropriate event
+// and unsubscribing its dependencies
+func (t *task) end() {
+	t.Lock()
+	t.state = core.TaskEnded
+	t.Unlock()
+	event := new(scheduler_event.TaskEndedEvent)
+	event.TaskID = t.id
+	defer t.eventEmitter.Emit(event)
+
+	// We need to unsubscribe from deps when a task has ended
+	t.UnsubscribePlugins()
 }
 
 func (t *task) waitForSchedule() {

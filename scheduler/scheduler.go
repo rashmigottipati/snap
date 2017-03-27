@@ -761,9 +761,6 @@ func (s *scheduler) HandleGomitEvent(e gomit.Event) {
 			"event-namespace": e.Namespace(),
 			"task-id":         v.TaskID,
 		}).Debug("event received")
-		// We need to unsubscribe from deps when a task has ended
-		task, _ := s.getTask(v.TaskID)
-		task.UnsubscribePlugins()
 		s.taskWatcherColl.handleTaskEnded(v.TaskID)
 	case *scheduler_event.TaskDisabledEvent:
 		log.WithFields(log.Fields{
@@ -773,9 +770,6 @@ func (s *scheduler) HandleGomitEvent(e gomit.Event) {
 			"task-id":         v.TaskID,
 			"disabled-reason": v.Why,
 		}).Debug("event received")
-		// We need to unsubscribe from deps when a task goes disabled
-		task, _ := s.getTask(v.TaskID)
-		task.UnsubscribePlugins()
 		s.taskWatcherColl.handleTaskDisabled(v.TaskID, v.Why)
 	default:
 		log.WithFields(log.Fields{
