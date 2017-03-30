@@ -471,8 +471,6 @@ func (t *task) spin() {
 			// If response show this schedule is still active we fire
 			case schedule.Active:
 				t.missedIntervals += sr.Missed()
-				t.lastFireTime = time.Now()
-				t.hitCount++
 				t.fire()
 				if t.lastFailureTime == t.lastFireTime {
 					consecutiveFailures++
@@ -517,10 +515,7 @@ func (t *task) spin() {
 			}
 		case <-t.killChan:
 			// Only here can it truly be stopped
-			t.Lock()
-			t.state = core.TaskStopped
-			t.lastFireTime = time.Time{}
-			t.Unlock()
+			t.stop()
 			return
 		}
 	}
@@ -531,7 +526,9 @@ func (t *task) fire() {
 	defer t.Unlock()
 
 	t.state = core.TaskFiring
+	t.lastFireTime = time.Now()
 	t.workflow.Start(t)
+	t.hitCount++
 	t.state = core.TaskSpinning
 }
 
@@ -553,7 +550,11 @@ func (t *task) disable(failureMsg string) {
 }
 
 // end proceeds ending a task which consists of changing task state to ended, emitting an appropriate event
+<<<<<<< 5c719ddf5ec1bc851c5afb5a9f7681994d793b14
 // and unsubscribing its dependencies
+=======
+// and unsubscribing its dependencies;
+>>>>>>> wip - for Rashmi
 func (t *task) end() {
 	t.Lock()
 	t.state = core.TaskEnded
@@ -563,6 +564,20 @@ func (t *task) end() {
 	defer t.eventEmitter.Emit(event)
 
 	// We need to unsubscribe from deps when a task has ended
+	t.UnsubscribePlugins()
+}
+
+// stop proceeds stopping a task which consists of changing task state to stopped, emitting an appropriate event
+// and unsubscribing its dependencies
+func (t *task) stop() {
+	t.Lock()
+	t.state = core.TaskStopped
+	t.Unlock()
+
+	event := new(scheduler_event.TaskStoppedEvent)
+	event.TaskID = t.id
+	defer t.eventEmitter.Emit(event)
+	// We need to unsubscribe from deps when a task has been stopped
 	t.UnsubscribePlugins()
 }
 

@@ -570,15 +570,6 @@ func (s *scheduler) stopTask(id, source string) []serror.SnapError {
 		}
 	default:
 
-		if errs := t.UnsubscribePlugins(); len(errs) != 0 {
-			return errs
-		}
-
-		event := &scheduler_event.TaskStoppedEvent{
-			TaskID: t.ID(),
-			Source: source,
-		}
-		defer s.eventManager.Emit(event)
 		t.Stop()
 		logger.WithFields(log.Fields{
 			"task-id":    t.ID(),
