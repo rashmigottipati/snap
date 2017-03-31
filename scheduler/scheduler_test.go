@@ -158,7 +158,7 @@ func (l *listenToPluginEvent) HandleGomitEvent(e gomit.Event) {
 	}
 }
 
-func TestScheduler(t *testing.T) {
+func TestScheduler1(t *testing.T) {
 	log.SetLevel(log.FatalLevel)
 	Convey("NewTask", t, func() {
 		c := new(mockMetricManager)
@@ -210,6 +210,16 @@ func TestScheduler(t *testing.T) {
 			t.(*task).Spin()
 			time.Sleep(100 * time.Millisecond) // let's wait for things to settle
 			So(t.State(), ShouldResemble, core.TaskFiring)
+			c.timeToWait = 0
+		})
+
+		Convey("stop task", func() {
+			c.timeToWait = 200 * time.Millisecond
+			t.(*task).Spin()
+			time.Sleep(100 * time.Millisecond) // let's wait for things to settle
+			t.(*task).Stop()
+			//time.Sleep(100 * time.Millisecond)
+			So(t.State(), ShouldResemble, core.TaskStopped) //task is in stopping state
 			c.timeToWait = 0
 		})
 
