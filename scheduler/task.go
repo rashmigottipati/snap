@@ -550,11 +550,7 @@ func (t *task) disable(failureMsg string) {
 }
 
 // end proceeds ending a task which consists of changing task state to ended, emitting an appropriate event
-<<<<<<< 5c719ddf5ec1bc851c5afb5a9f7681994d793b14
 // and unsubscribing its dependencies
-=======
-// and unsubscribing its dependencies;
->>>>>>> wip - for Rashmi
 func (t *task) end() {
 	t.Lock()
 	t.state = core.TaskEnded
