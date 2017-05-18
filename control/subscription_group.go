@@ -458,7 +458,7 @@ func (s *subscriptionGroup) subscribePlugins(id string,
 					serrs = append(serrs, serror.New(err))
 					return serrs
 				}
-				err = s.pluginRunner.runPlugin(plg.Name(), plg.Details)
+				err = s.pluginRunner.executePlugin(plg.Name(), plg.Details)
 				if err != nil {
 					serrs = append(serrs, serror.New(err))
 					return serrs

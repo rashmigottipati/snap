@@ -69,21 +69,19 @@ type executablePlugin interface {
 
 // Handles events pertaining to plugins and control the runnning state accordingly.
 type runner struct {
-	delegates         []gomit.Delegator
-	emitter           gomit.Emitter
-	monitor           *monitor
-	availablePlugins  *availablePlugins
-	metricCatalog     catalogsMetrics
-	pluginManager     managesPlugins
-	grpcSecurity      client.GRPCSecurity
-	pluginLoadTimeout int
+	delegates        []gomit.Delegator
+	emitter          gomit.Emitter
+	monitor          *monitor
+	availablePlugins *availablePlugins
+	metricCatalog    catalogsMetrics
+	pluginManager    managesPlugins
+	grpcSecurity     client.GRPCSecurity
 }
 
 func newRunner(opts ...pluginRunnerOpt) *runner {
 	r := &runner{
-		pluginLoadTimeout: defaultPluginLoadTimeout,
-		monitor:           newMonitor(),
-		availablePlugins:  newAvailablePlugins(),
+		monitor:          newMonitor(),
+		availablePlugins: newAvailablePlugins(),
 	}
 	mergedOpts := append([]pluginRunnerOpt{}, defaultRunnerOpts...)
 	mergedOpts = append(mergedOpts, opts...)
@@ -126,11 +124,6 @@ func (r *runner) AvailablePlugins() *availablePlugins {
 
 func (r *runner) Monitor() *monitor {
 	return r.monitor
-}
-
-// SetPluginLoadTimeout sets plugin load timeout
-func (r *runner) SetPluginLoadTimeout(timeout int) {
-	r.pluginLoadTimeout = timeout
 }
 
 // Adds Delegates (gomit.Delegator) for adding Runner handlers to on Start and
@@ -184,78 +177,6 @@ func (r *runner) Stop() []error {
 		"_block": "start-plugin",
 	}).Debug("stopped")
 	return errs
-}
-
-func (r *runner) startPlugin(p executablePlugin) (*availablePlugin, error) {
-	type result struct {
-		ap  *availablePlugin
-		err error
-	}
-	resultChan := make(chan result)
-	go func() {
-		resp, err := p.Run(time.Second * time.Duration(r.pluginLoadTimeout))
-		if err != nil {
-			e := errors.New("error starting plugin: " + err.Error())
-			runnerLog.WithFields(log.Fields{
-				"_block": "start-plugin",
-				"error":  e.Error(),
-			}).Error("error starting a plugin")
-			resultChan <- result{nil, e}
-			return
-
-		}
-
-		if resp.State != plugin.PluginSuccess {
-			e := errors.New("plugin could not start error: " + resp.ErrorMessage)
-			runnerLog.WithFields(log.Fields{
-				"_block": "start-plugin",
-				"error":  e.Error(),
-			}).Error("error starting a plugin")
-			resultChan <- result{nil, e}
-			return
-		}
-
-		// build availablePlugin
-		ap, err := newAvailablePlugin(resp, r.emitter, p, r.grpcSecurity)
-		if err != nil {
-			resultChan <- result{nil, err}
-			return
-		}
-
-		if resp.Meta.Unsecure {
-			err = ap.client.Ping()
-		} else {
-			err = ap.client.SetKey()
-		}
-		if err != nil {
-			resultChan <- result{nil, err}
-			return
-		}
-		r.availablePlugins.insert(ap)
-
-		runnerLog.WithFields(log.Fields{
-			"_block":                "start-plugin",
-			"available-plugin":      ap.String(),
-			"available-plugin-type": ap.TypeName(),
-		}).Info("available plugin started")
-		resultChan <- result{ap, nil}
-
-		defer r.emitter.Emit(&control_event.StartPluginEvent{
-			Name:    ap.Name(),
-			Version: ap.Version(),
-			Type:    int(ap.Type()),
-			Key:     ap.key,
-			Id:      ap.ID(),
-		})
-	}()
-
-	select {
-	case results := <-resultChan:
-		return results.ap, results.err
-	case <-time.After(time.Second * time.Duration(r.pluginLoadTimeout)):
-		e := errors.New("error starting plugin due to timeout")
-		return nil, e
-	}
 }
 
 func (r *runner) stopPlugin(reason string, ap *availablePlugin) error {
@@ -354,7 +275,7 @@ func (r *runner) HandleGomitEvent(e gomit.Event) {
 	}
 }
 
-func (r *runner) runPlugin(name string, details *pluginDetails) error {
+func (r *runner) executePlugin(name string, details *pluginDetails) error {
 	if details.IsPackage {
 		f, err := os.Open(details.Path)
 		if err != nil {
@@ -367,33 +288,31 @@ func (r *runner) runPlugin(name string, details *pluginDetails) error {
 		}
 		details.ExecPath = path.Join(tempPath, "rootfs")
 	}
-	commands := make([]string, len(details.Exec))
-	for i, e := range details.Exec {
-		commands[i] = path.Join(details.ExecPath, e)
-	}
-	ePlugin, err := plugin.NewExecutablePlugin(r.pluginManager.GenerateArgs(int(log.GetLevel())).
-		SetCertPath(details.CertPath).
-		SetKeyPath(details.KeyPath).
-		SetCACertPaths(details.CACertPaths).
-		SetTLSEnabled(details.TLSEnabled), commands...)
+	ap, err := r.pluginManager.runPlugin(details, r.emitter, name)
 	if err != nil {
 		runnerLog.WithFields(log.Fields{
 			"_block": "run-plugin",
-			"path":   commands,
-			"error":  err,
-		}).Error("error creating executable plugin")
-		return err
-	}
-	ePlugin.SetName(name)
-	ap, err := r.startPlugin(ePlugin)
-	if err != nil {
-		runnerLog.WithFields(log.Fields{
-			"_block": "run-plugin",
-			"path":   commands,
 			"error":  err,
 		}).Error("error starting new plugin")
 		return err
 	}
+
+	r.availablePlugins.insert(ap)
+
+	pmLogger.WithFields(log.Fields{
+		"_block":                "run-plugin",
+		"available-plugin":      ap.String(),
+		"available-plugin-type": ap.TypeName(),
+	}).Info("available plugin started")
+
+	defer r.emitter.Emit(&control_event.StartPluginEvent{
+		Name:    ap.Name(),
+		Version: ap.Version(),
+		Type:    int(ap.Type()),
+		Key:     ap.key,
+		Id:      ap.ID(),
+	})
+
 	ap.execPath = details.ExecPath
 	if details.IsPackage {
 		ap.fromPackage = true
@@ -452,5 +371,5 @@ func (r *runner) restartPlugin(key string) error {
 	if err != nil {
 		return err
 	}
-	return r.runPlugin(lp.Name(), lp.Details)
+	return r.executePlugin(lp.Name(), lp.Details)
 }

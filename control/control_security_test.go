@@ -88,7 +88,7 @@ func TestSecureCollector(t *testing.T) {
 		Convey("framework should establish secure connection", func() {
 			security := client.SecurityTLSExtended(tlsTestCli+fixtures.TestCrtFileExt, tlsTestCli+fixtures.TestKeyFileExt, client.SecureClient, []string{tlsTestCA + fixtures.TestCrtFileExt})
 			var err error
-			ap, err = runPlugin(plugin.Arg{}.
+			ap, err = executePlugin(plugin.Arg{}.
 				SetCertPath(tlsTestSrv+fixtures.TestCrtFileExt).
 				SetKeyPath(tlsTestSrv+fixtures.TestKeyFileExt).
 				SetCACertPaths(tlsTestCA+fixtures.TestCrtFileExt).
@@ -130,7 +130,7 @@ func TestSecureProcessor(t *testing.T) {
 		Convey("framework should establish secure connection", func() {
 			security := client.SecurityTLSExtended(tlsTestCli+fixtures.TestCrtFileExt, tlsTestCli+fixtures.TestKeyFileExt, client.SecureClient, []string{tlsTestCA + fixtures.TestCrtFileExt})
 			var err error
-			ap, err = runPlugin(plugin.Arg{}.
+			ap, err = executePlugin(plugin.Arg{}.
 				SetCertPath(tlsTestSrv+fixtures.TestCrtFileExt).
 				SetKeyPath(tlsTestSrv+fixtures.TestKeyFileExt).
 				SetCACertPaths(tlsTestCA+fixtures.TestCrtFileExt).
@@ -168,7 +168,7 @@ func TestSecurePublisher(t *testing.T) {
 		Convey("framework should establish secure connection", func() {
 			security := client.SecurityTLSExtended(tlsTestCli+fixtures.TestCrtFileExt, tlsTestCli+fixtures.TestKeyFileExt, client.SecureClient, []string{tlsTestCA + fixtures.TestCrtFileExt})
 			var err error
-			ap, err = runPlugin(plugin.NewArg(int(log.DebugLevel), false).
+			ap, err = executePlugin(plugin.NewArg(int(log.DebugLevel), false).
 				SetCertPath(tlsTestSrv+fixtures.TestCrtFileExt).
 				SetKeyPath(tlsTestSrv+fixtures.TestKeyFileExt).
 				SetCACertPaths(tlsTestCA+fixtures.TestCrtFileExt).
@@ -213,7 +213,7 @@ func TestSecureStreamingCollector(t *testing.T) {
 		Convey("framework should establish secure connection", func() {
 			security := client.SecurityTLSExtended(tlsTestCli+fixtures.TestCrtFileExt, tlsTestCli+fixtures.TestKeyFileExt, client.SecureClient, []string{tlsTestCA + fixtures.TestCrtFileExt})
 			var err error
-			ap, err = runPlugin(plugin.Arg{}.
+			ap, err = executePlugin(plugin.Arg{}.
 				SetCertPath(tlsTestSrv+fixtures.TestCrtFileExt).
 				SetKeyPath(tlsTestSrv+fixtures.TestKeyFileExt).
 				SetCACertPaths(tlsTestCA+fixtures.TestCrtFileExt).
@@ -362,7 +362,7 @@ func TestInsecureConfigurationFails(t *testing.T) {
 				Convey("should fail", func() {
 					So(func() {
 						var err error
-						ap, err = runPlugin(pluginArgs, helper.PluginFilePath("snap-plugin-collector-mock2-grpc"),
+						ap, err = executePlugin(pluginArgs, helper.PluginFilePath("snap-plugin-collector-mock2-grpc"),
 							security)
 						// currently grpc may not return error immediately; attempt to ping
 						if err != nil {
@@ -483,7 +483,7 @@ func TestSecuritySetupFromConfig(t *testing.T) {
 	}
 }
 
-func runPlugin(args plugin.Arg, pluginPath string, security client.GRPCSecurity) (*availablePlugin, error) {
+func executePlugin(args plugin.Arg, pluginPath string, security client.GRPCSecurity) (*availablePlugin, error) {
 	ep, err := plugin.NewExecutablePlugin(args, pluginPath)
 	if err != nil {
 		panic(err)

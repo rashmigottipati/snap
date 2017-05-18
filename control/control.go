@@ -115,8 +115,7 @@ type runsPlugins interface {
 	SetMetricCatalog(catalogsMetrics)
 	SetPluginManager(managesPlugins)
 	Monitor() *monitor
-	runPlugin(string, *pluginDetails) error
-	SetPluginLoadTimeout(int)
+	executePlugin(string, *pluginDetails) error
 }
 
 type managesPlugins interface {
@@ -124,6 +123,7 @@ type managesPlugins interface {
 	get(string) (*loadedPlugin, error)
 	all() map[string]*loadedPlugin
 	LoadPlugin(*pluginDetails, gomit.Emitter) (*loadedPlugin, serror.SnapError)
+	runPlugin(*pluginDetails, gomit.Emitter, ...string) (*availablePlugin, error)
 	UnloadPlugin(core.Plugin) (*loadedPlugin, serror.SnapError)
 	SetMetricCatalog(catalogsMetrics)
 	GenerateArgs(logLevel int) plugin.Arg
@@ -175,7 +175,6 @@ func OptSetConfig(cfg *Config) PluginControlOpt {
 		c.Config = cfg
 		c.pluginManager.SetPluginConfig(cfg.Plugins)
 		c.pluginManager.SetPluginLoadTimeout(c.Config.PluginLoadTimeout)
-		c.pluginRunner.SetPluginLoadTimeout(c.Config.PluginLoadTimeout)
 	}
 }
 

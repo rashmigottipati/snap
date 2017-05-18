@@ -70,6 +70,10 @@ var (
 
 	pmLogger = log.WithField("_module", "control-plugin-mgr")
 
+	resp    plugin.Response
+	ePlugin *plugin.ExecutablePlugin
+	err     error
+
 	defaultManagerOpts = []pluginManagerOpt{optDefaultManagerSecurity()}
 )
 
@@ -354,9 +358,7 @@ func (p *pluginManager) LoadPlugin(details *pluginDetails, emitter gomit.Emitter
 		lPlugin.State = DetectedState
 
 		var (
-			ePlugin *plugin.ExecutablePlugin
-			resp    plugin.Response
-			err     error
+			ap *availablePlugin
 		)
 
 		if lPlugin.Details.Uri == nil {
@@ -364,52 +366,12 @@ func (p *pluginManager) LoadPlugin(details *pluginDetails, emitter gomit.Emitter
 				"_block": "load-plugin",
 				"path":   filepath.Base(lPlugin.Details.Exec[0]),
 			}).Info("plugin load called")
-			// We will create commands by appending the ExecPath to the actual command.
-			// The ExecPath is a temporary location where the plugin/package will be
-			// run from.
-			commands := make([]string, len(lPlugin.Details.Exec))
-			for i, e := range lPlugin.Details.Exec {
-				commands[i] = filepath.Join(lPlugin.Details.ExecPath, e)
-			}
-
-			ePlugin, err = plugin.NewExecutablePlugin(
-				p.GenerateArgs(int(log.GetLevel())).
-					SetCertPath(details.CertPath).
-					SetKeyPath(details.KeyPath).
-					SetCACertPaths(details.CACertPaths).
-					SetTLSEnabled(details.TLSEnabled),
-				commands...)
+			ap, err = p.runPlugin(details, emitter)
 			if err != nil {
 				pmLogger.WithFields(log.Fields{
 					"_block": "load-plugin",
 					"error":  err.Error(),
-				}).Error("load plugin error while creating executable plugin")
-				resultChan <- result{nil, serror.New(err)}
-				return
-			}
-			pmLogger.WithFields(log.Fields{
-				"_block": "load-plugin",
-				"path":   lPlugin.Details.Exec,
-			}).Debug(fmt.Sprintf("plugin load timeout set to %ds", p.pluginLoadTimeout))
-			resp, err = ePlugin.Run(time.Second * time.Duration(p.pluginLoadTimeout))
-			if err != nil {
-				pmLogger.WithFields(log.Fields{
-					"_block": "load-plugin",
-					"error":  err.Error(),
-				}).Error("load plugin error when starting plugin")
-				resultChan <- result{nil, serror.New(err)}
-				return
-			}
-
-			ePlugin.SetName(resp.Meta.Name)
-
-			key := fmt.Sprintf("%s"+core.Separator+"%s"+core.Separator+"%d", resp.Meta.Type.String(), resp.Meta.Name, resp.Meta.Version)
-			if _, exists := p.loadedPlugins.table[key]; exists {
-				resultChan <- result{nil, serror.New(ErrPluginAlreadyLoaded, map[string]interface{}{
-					"plugin-name":    resp.Meta.Name,
-					"plugin-version": resp.Meta.Version,
-					"plugin-type":    resp.Type.String(),
-				})}
+				}).Error("error in creating available plugin")
 			}
 		} else {
 			pmLogger.WithFields(log.Fields{
@@ -434,34 +396,31 @@ func (p *pluginManager) LoadPlugin(details *pluginDetails, emitter gomit.Emitter
 					"error":  err.Error(),
 				}).Error("error during json unmarshal")
 			}
-		}
-		ap, err := newAvailablePlugin(resp, emitter, ePlugin, p.grpcSecurity)
-		if err != nil {
-			pmLogger.WithFields(log.Fields{
-				"_block": "load-plugin",
-				"error":  err.Error(),
-			}).Error("load plugin error while creating available plugin")
-			resultChan <- result{nil, serror.New(err)}
-			return
-		}
-
-		if lPlugin.Details.Uri != nil {
+			ap, err = newAvailablePlugin(resp, emitter, ePlugin, p.grpcSecurity)
+			if err != nil {
+				pmLogger.WithFields(log.Fields{
+					"_block": "load-plugin",
+					"error":  err.Error(),
+				}).Error("load plugin error while creating available plugin")
+				resultChan <- result{nil, serror.New(err)}
+				return
+			}
 			ap.SetIsRemote(true)
-		}
 
-		if resp.Meta.Unsecure {
-			err = ap.client.Ping()
-		} else {
-			err = ap.client.SetKey()
-		}
+			if resp.Meta.Unsecure {
+				err = ap.client.Ping()
+			} else {
+				err = ap.client.SetKey()
+			}
 
-		if err != nil {
-			pmLogger.WithFields(log.Fields{
-				"_block": "load-plugin",
-				"error":  err.Error(),
-			}).Error("load plugin error while pinging the plugin")
-			resultChan <- result{nil, serror.New(err)}
-			return
+			if err != nil {
+				pmLogger.WithFields(log.Fields{
+					"_block": "load-plugin",
+					"error":  err.Error(),
+				}).Error("load plugin error while pinging the plugin")
+				resultChan <- result{nil, serror.New(err)}
+				return
+			}
 		}
 
 		// Get the ConfigPolicy and add it to the loaded plugin
@@ -619,17 +578,6 @@ func (p *pluginManager) LoadPlugin(details *pluginDetails, emitter gomit.Emitter
 				resultChan <- result{nil, serror.New(err)}
 				return
 			}
-		}
-
-		if resp.State != plugin.PluginSuccess {
-			e := fmt.Errorf("plugin loading did not succeed: %s\n", resp.ErrorMessage)
-			pmLogger.WithFields(log.Fields{
-				"_block":          "load-plugin",
-				"error":           e,
-				"plugin response": resp.ErrorMessage,
-			}).Error("load plugin error")
-			resultChan <- result{nil, serror.New(e)}
-			return
 		}
 
 		aErr := p.loadedPlugins.add(lPlugin)
@@ -810,4 +758,98 @@ func (p *pluginManager) AddStandardAndWorkflowTags(m core.Metric, allTags map[st
 		Timestamp_:          m.Timestamp(),
 	}
 	return metric
+}
+
+func (p *pluginManager) runPlugin(details *pluginDetails, emitter gomit.Emitter, name ...string) (*availablePlugin, error) {
+	// We will create commands by appending the ExecPath to the actual command.
+	// The ExecPath is a temporary location where the plugin/package will be
+	// run from.
+	var (
+		ap *availablePlugin
+	)
+	commands := make([]string, len(details.Exec))
+	for i, e := range details.Exec {
+		commands[i] = filepath.Join(details.ExecPath, e)
+	}
+
+	ePlugin, err = plugin.NewExecutablePlugin(
+		p.GenerateArgs(int(log.GetLevel())).
+			SetCertPath(details.CertPath).
+			SetKeyPath(details.KeyPath).
+			SetCACertPaths(details.CACertPaths).
+			SetTLSEnabled(details.TLSEnabled),
+		commands...)
+	if err != nil {
+		pmLogger.WithFields(log.Fields{
+			"_block": "load-plugin",
+			"error":  err.Error(),
+		}).Error("load plugin error while creating executable plugin")
+		return nil, serror.New(err)
+	}
+
+	pmLogger.WithFields(log.Fields{
+		"_block": "load-plugin",
+		"path":   details.Exec,
+	}).Debug(fmt.Sprintf("plugin load timeout set to %ds", p.pluginLoadTimeout))
+
+	resp, err = ePlugin.Run(time.Second * time.Duration(p.pluginLoadTimeout))
+	if err != nil {
+		e := errors.New("error starting plugin: " + err.Error())
+		pmLogger.WithFields(log.Fields{
+			"_block": "start-plugin",
+			"error":  e.Error(),
+		}).Error("load plugin error when starting plugin")
+		return nil, e
+
+	}
+
+	if resp.State != plugin.PluginSuccess {
+		e := fmt.Errorf("plugin loading did not succeed: %s\n", resp.ErrorMessage)
+		pmLogger.WithFields(log.Fields{
+			"_block":          "load-plugin",
+			"error":           e,
+			"plugin response": resp.ErrorMessage,
+		}).Error("load plugin error")
+		return nil, e
+	}
+
+	if len(name) == 0 {
+		ePlugin.SetName(resp.Meta.Name)
+	} else {
+		ePlugin.SetName(name[0])
+	}
+
+	key := fmt.Sprintf("%s"+core.Separator+"%s"+core.Separator+"%d", resp.Meta.Type.String(), resp.Meta.Name, resp.Meta.Version)
+	if _, exists := p.loadedPlugins.table[key]; exists {
+		return nil, serror.New(ErrPluginAlreadyLoaded, map[string]interface{}{
+			"plugin-name":    resp.Meta.Name,
+			"plugin-version": resp.Meta.Version,
+			"plugin-type":    resp.Type.String(),
+		})
+	}
+
+	// build availablePlugin
+	ap, err = newAvailablePlugin(resp, emitter, ePlugin, p.grpcSecurity)
+	if err != nil {
+		pmLogger.WithFields(log.Fields{
+			"_block": "run-plugin",
+			"error":  err.Error(),
+		}).Error("run plugin error while building the available plugin")
+		return nil, err
+	}
+
+	if resp.Meta.Unsecure {
+		err = ap.client.Ping()
+	} else {
+		err = ap.client.SetKey()
+	}
+	if err != nil {
+		pmLogger.WithFields(log.Fields{
+			"_block": "load-plugin",
+			"error":  err.Error(),
+		}).Error("load plugin error while pinging the plugin")
+		return nil, serror.New(err)
+	}
+
+	return ap, nil
 }
