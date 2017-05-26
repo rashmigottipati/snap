@@ -767,6 +767,7 @@ func (p *pluginManager) runPlugin(details *pluginDetails, emitter gomit.Emitter,
 	var (
 		ap *availablePlugin
 	)
+
 	commands := make([]string, len(details.Exec))
 	for i, e := range details.Exec {
 		commands[i] = filepath.Join(details.ExecPath, e)

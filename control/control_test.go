@@ -65,6 +65,9 @@ type MockPluginManagerBadSwap struct {
 	loadedPlugins  *loadedPlugins
 }
 
+func (m *MockPluginManagerBadSwap) runPlugin(*pluginDetails, gomit.Emitter, ...string) (*availablePlugin, error) {
+	return new(availablePlugin), nil
+}
 func (m *MockPluginManagerBadSwap) LoadPlugin(*pluginDetails, gomit.Emitter) (*loadedPlugin, serror.SnapError) {
 	return new(loadedPlugin), nil
 }
