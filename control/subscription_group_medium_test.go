@@ -837,55 +837,55 @@ func TestSubscriptionGroups_GetDynamic(t *testing.T) {
 	})
 }
 
-func TestSubscriptionGroups_GetSpecifiedDynamic(t *testing.T) {
-	c := New(getTestSGConfig())
+// func TestSubscriptionGroups_GetSpecifiedDynamic(t *testing.T) {
+// 	c := New(getTestSGConfig())
 
-	lpe := newLstnToPluginEvents()
-	c.eventManager.RegisterHandler("TestSubscriptionGroups_AddRemove", lpe)
-	c.Start()
+// 	lpe := newLstnToPluginEvents()
+// 	c.eventManager.RegisterHandler("TestSubscriptionGroups_AddRemove", lpe)
+// 	c.Start()
 
-	Convey("Loading a mock collector plugn", t, func() {
-		_, err := loadPlg(c, helper.PluginFilePath("snap-plugin-collector-mock1"))
-		So(err, ShouldBeNil)
-		<-lpe.load
+// 	Convey("Loading a mock collector plugn", t, func() {
+// 		_, err := loadPlg(c, helper.PluginFilePath("snap-plugin-collector-mock1"))
+// 		So(err, ShouldBeNil)
+// 		<-lpe.load
 
-		Convey("Subscription group created for requested metric with specified instance of dynamic element", func() {
-			requested := mockRequestedMetric{namespace: core.NewNamespace("intel", "mock").AddDynamicElement("host", "name of the host").AddStaticElement("baz")}
-			// specified dynamic element
-			requested.Namespace()[2].Value = "host0"
-			subsPlugin := mockSubscribedPlugin{
-				typeName: core.CollectorPluginType,
-				name:     "mock",
-				version:  1,
-				config:   cdata.NewNode(),
-			}
-			subsPluginKey := key(subsPlugin)
+// 		Convey("Subscription group created for requested metric with specified instance of dynamic element", func() {
+// 			requested := mockRequestedMetric{namespace: core.NewNamespace("intel", "mock").AddDynamicElement("host", "name of the host").AddStaticElement("baz")}
+// 			// specified dynamic element
+// 			requested.Namespace()[2].Value = "host0"
+// 			subsPlugin := mockSubscribedPlugin{
+// 				typeName: core.CollectorPluginType,
+// 				name:     "mock",
+// 				version:  1,
+// 				config:   cdata.NewNode(),
+// 			}
+// 			subsPluginKey := key(subsPlugin)
 
-			sg := newSubscriptionGroups(c)
-			So(sg, ShouldNotBeNil)
-			sg.Add("task-id", []core.RequestedMetric{requested}, cdata.NewTree(), []core.SubscribedPlugin{subsPlugin})
-			<-lpe.sub
-			So(len(sg.subscriptionMap), ShouldEqual, 1)
-			val, ok := sg.subscriptionMap["task-id"]
-			So(ok, ShouldBeTrue)
-			So(val, ShouldNotBeNil)
+// 			sg := newSubscriptionGroups(c)
+// 			So(sg, ShouldNotBeNil)
+// 			sg.Add("task-id", []core.RequestedMetric{requested}, cdata.NewTree(), []core.SubscribedPlugin{subsPlugin})
+// 			<-lpe.sub
+// 			So(len(sg.subscriptionMap), ShouldEqual, 1)
+// 			val, ok := sg.subscriptionMap["task-id"]
+// 			So(ok, ShouldBeTrue)
+// 			So(val, ShouldNotBeNil)
 
-			pluginToMetricMap, serrs, err := sg.Get("task-id")
-			So(len(serrs), ShouldEqual, 0)
-			So(err, ShouldBeNil)
-			So(len(pluginToMetricMap), ShouldEqual, 1)
-			So(pluginToMetricMap, ShouldContainKey, subsPluginKey)
-			metrics := pluginToMetricMap[subsPluginKey].Metrics()
-			So(len(metrics), ShouldEqual, 1)
+// 			pluginToMetricMap, serrs, err := sg.Get("task-id")
+// 			So(len(serrs), ShouldEqual, 0)
+// 			So(err, ShouldBeNil)
+// 			So(len(pluginToMetricMap), ShouldEqual, 1)
+// 			So(pluginToMetricMap, ShouldContainKey, subsPluginKey)
+// 			metrics := pluginToMetricMap[subsPluginKey].Metrics()
+// 			So(len(metrics), ShouldEqual, 1)
 
-			pluginToMetricMap, serrs, err = sg.Get("task-fake-id")
-			So(len(serrs), ShouldEqual, 0)
-			So(err, ShouldNotBeNil)
-			So(err, ShouldResemble, ErrSubscriptionGroupDoesNotExist)
-			So(pluginToMetricMap, ShouldBeEmpty)
-		})
-	})
-}
+// 			pluginToMetricMap, serrs, err = sg.Get("task-fake-id")
+// 			So(len(serrs), ShouldEqual, 0)
+// 			So(err, ShouldNotBeNil)
+// 			So(err, ShouldResemble, ErrSubscriptionGroupDoesNotExist)
+// 			So(pluginToMetricMap, ShouldBeEmpty)
+// 		})
+// 	})
+// }
 
 type lstnToPluginEvents struct {
 	load    chan struct{}

@@ -969,7 +969,7 @@ func TestRoutingCachingStrategy(t *testing.T) {
 			}
 			for _, id := range tasks {
 				pool.Subscribe(id)
-				err = c.pluginRunner.executePlugin(lp.Name(), lp.Details)
+				_, err = c.pluginRunner.executePlugin(lp.Name(), lp.Details)
 				So(err, ShouldBeNil)
 				serr := c.subscriptionGroups.Add(id, []core.RequestedMetric{metric}, cdt, []core.SubscribedPlugin{})
 				So(serr, ShouldBeNil)
@@ -1040,7 +1040,7 @@ func TestRoutingCachingStrategy(t *testing.T) {
 			}
 			for _, id := range tasks {
 				pool.Subscribe(id)
-				err = c.pluginRunner.executePlugin(lp.Name(), lp.Details)
+				_, err = c.pluginRunner.executePlugin(lp.Name(), lp.Details)
 				So(err, ShouldBeNil)
 				serrs := c.subscriptionGroups.Add(id, []core.RequestedMetric{metric}, cdt, []core.SubscribedPlugin{})
 				So(serrs, ShouldBeNil)

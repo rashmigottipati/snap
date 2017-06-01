@@ -253,6 +253,7 @@ type pluginManager struct {
 	pprof             bool
 	tempDirPath       string
 	grpcSecurity      client.GRPCSecurity
+	subscriptiongrp   *subscriptionGroup
 }
 
 func newPluginManager(opts ...pluginManagerOpt) *pluginManager {
@@ -266,6 +267,7 @@ func newPluginManager(opts ...pluginManagerOpt) *pluginManager {
 		logPath:           logPath,
 		pluginConfig:      newPluginConfig(),
 		pluginTags:        newPluginTags(),
+		subscriptiongrp:   newsubscriptionGroup(),
 	}
 	mergedOpts := append([]pluginManagerOpt{}, defaultManagerOpts...)
 	mergedOpts = append(mergedOpts, opts...)
@@ -359,6 +361,7 @@ func (p *pluginManager) LoadPlugin(details *pluginDetails, emitter gomit.Emitter
 
 		var (
 			ap *availablePlugin
+			//e  error
 		)
 
 		if lPlugin.Details.Uri == nil {
@@ -372,8 +375,11 @@ func (p *pluginManager) LoadPlugin(details *pluginDetails, emitter gomit.Emitter
 					"_block": "load-plugin",
 					"error":  err.Error(),
 				}).Error("error in creating available plugin")
+				resultChan <- result{nil, serror.New(err)}
+				return
 			}
 		} else {
+
 			pmLogger.WithFields(log.Fields{
 				"_block": "load-plugin",
 				"uri":    lPlugin.Details.Uri.String(),
@@ -785,9 +791,8 @@ func (p *pluginManager) runPlugin(details *pluginDetails, emitter gomit.Emitter,
 			"_block": "load-plugin",
 			"error":  err.Error(),
 		}).Error("load plugin error while creating executable plugin")
-		return nil, serror.New(err)
+		return nil, err
 	}
-
 	pmLogger.WithFields(log.Fields{
 		"_block": "load-plugin",
 		"path":   details.Exec,
@@ -805,7 +810,7 @@ func (p *pluginManager) runPlugin(details *pluginDetails, emitter gomit.Emitter,
 	}
 
 	if resp.State != plugin.PluginSuccess {
-		e := fmt.Errorf("plugin loading did not succeed: %s\n", resp.ErrorMessage)
+		e := fmt.Errorf("plugin loading did not succeed: %s\n" + resp.ErrorMessage)
 		pmLogger.WithFields(log.Fields{
 			"_block":          "load-plugin",
 			"error":           e,
@@ -819,18 +824,27 @@ func (p *pluginManager) runPlugin(details *pluginDetails, emitter gomit.Emitter,
 	} else {
 		ePlugin.SetName(name[0])
 	}
-
-	key := fmt.Sprintf("%s"+core.Separator+"%s"+core.Separator+"%d", resp.Meta.Type.String(), resp.Meta.Name, resp.Meta.Version)
-	if _, exists := p.loadedPlugins.table[key]; exists {
-		return nil, serror.New(ErrPluginAlreadyLoaded, map[string]interface{}{
-			"plugin-name":    resp.Meta.Name,
-			"plugin-version": resp.Meta.Version,
-			"plugin-type":    resp.Type.String(),
-		})
+	log.Debugf("flag is set to %+v", p.subscriptiongrp.IsSubscribe)
+	if !p.subscriptiongrp.IsSubscribe {
+		//log.Debugf("flag is set to %+v", p.subscriptiongrp.IsSubscribe)
+		key := fmt.Sprintf("%s"+core.Separator+"%s"+core.Separator+"%d", resp.Meta.Type.String(), resp.Meta.Name, resp.Meta.Version)
+		if _, exists := p.loadedPlugins.table[key]; exists {
+			return nil, serror.New(ErrPluginAlreadyLoaded, map[string]interface{}{
+				"plugin-name":    resp.Meta.Name,
+				"plugin-version": resp.Meta.Version,
+				"plugin-type":    resp.Type.String(),
+			})
+		}
 	}
 
 	// build availablePlugin
 	ap, err = newAvailablePlugin(resp, emitter, ePlugin, p.grpcSecurity)
+	pmLogger.WithFields(log.Fields{
+		"_block":           "run-plugin",
+		"exec-plugin":      ePlugin,
+		"available-plugin": ap.String(),
+	}).Info("available plugin started")
+
 	if err != nil {
 		pmLogger.WithFields(log.Fields{
 			"_block": "run-plugin",
@@ -849,7 +863,7 @@ func (p *pluginManager) runPlugin(details *pluginDetails, emitter gomit.Emitter,
 			"_block": "load-plugin",
 			"error":  err.Error(),
 		}).Error("load plugin error while pinging the plugin")
-		return nil, serror.New(err)
+		return nil, err
 	}
 
 	return ap, nil

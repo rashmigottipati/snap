@@ -275,16 +275,16 @@ func (r *runner) HandleGomitEvent(e gomit.Event) {
 	}
 }
 
-func (r *runner) executePlugin(name string, details *pluginDetails) error {
+func (r *runner) executePlugin(name string, details *pluginDetails) (*availablePlugin, error) {
 	if details.IsPackage {
 		f, err := os.Open(details.Path)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		defer f.Close()
 		tempPath, err := aci.Extract(f)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		details.ExecPath = path.Join(tempPath, "rootfs")
 	}
@@ -294,15 +294,16 @@ func (r *runner) executePlugin(name string, details *pluginDetails) error {
 			"_block": "run-plugin",
 			"error":  err,
 		}).Error("error starting new plugin")
-		return err
+		return nil, err
 	}
 
 	r.availablePlugins.insert(ap)
 
-	pmLogger.WithFields(log.Fields{
+	runnerLog.WithFields(log.Fields{
 		"_block":                "run-plugin",
 		"available-plugin":      ap.String(),
 		"available-plugin-type": ap.TypeName(),
+		"available-plugin-key":  ap.key,
 	}).Info("available plugin started")
 
 	defer r.emitter.Emit(&control_event.StartPluginEvent{
@@ -317,7 +318,7 @@ func (r *runner) executePlugin(name string, details *pluginDetails) error {
 	if details.IsPackage {
 		ap.fromPackage = true
 	}
-	return nil
+	return ap, nil
 }
 
 func (r *runner) handleUnsubscription(pType, pName string, pVersion int, taskID string) error {
@@ -371,5 +372,6 @@ func (r *runner) restartPlugin(key string) error {
 	if err != nil {
 		return err
 	}
-	return r.executePlugin(lp.Name(), lp.Details)
+	_, e := r.executePlugin(lp.Name(), lp.Details)
+	return e
 }

@@ -80,6 +80,14 @@ type subscriptionGroup struct {
 	// subscription groups are processed when the subscription group is added
 	// and when plugins are loaded/unloaded
 	errors []serror.SnapError
+
+	IsSubscribe bool
+}
+
+func newsubscriptionGroup() *subscriptionGroup {
+	return &subscriptionGroup{
+		IsSubscribe: false,
+	}
 }
 
 type subscriptionMap map[string]*subscriptionGroup
@@ -97,6 +105,14 @@ func newSubscriptionGroups(control *pluginControl) *subscriptionGroups {
 		control,
 	}
 }
+
+// func (s *subscriptionGroup) IsSubscribe() bool {
+// 	return s.IsSubscribe
+// }
+
+// func (s *subscriptionGroup) SetIsSubscribe(IsSubscribe bool) {
+// 	s.IsSubscribe = IsSubscribe
+// }
 
 // Add adds a subscription group provided a subscription group id, requested
 // metrics, config tree and plugins. The requested metrics are mapped to
@@ -367,6 +383,7 @@ func (s *subscriptionGroup) process(id string) (serrs []serror.SnapError) {
 		"unsubs": fmt.Sprintf("%+v", unsubs),
 	}).Debug("subscriptions")
 	if len(subs) > 0 {
+		//s.IsSubscribe = true
 		if errs := s.subscribePlugins(id, subs); errs != nil {
 			serrs = append(serrs, errs...)
 		}
@@ -388,6 +405,7 @@ func (s *subscriptionGroup) process(id string) (serrs []serror.SnapError) {
 
 func (s *subscriptionGroup) subscribePlugins(id string,
 	plugins []core.SubscribedPlugin) (serrs []serror.SnapError) {
+	log.SetLevel(log.DebugLevel)
 	plgs := make([]*loadedPlugin, len(plugins))
 	// First range through plugins to verify if all required plugins
 	// are available
@@ -458,11 +476,14 @@ func (s *subscriptionGroup) subscribePlugins(id string,
 					serrs = append(serrs, serror.New(err))
 					return serrs
 				}
-				err = s.pluginRunner.executePlugin(plg.Name(), plg.Details)
+				log.Debug("!!!!!!!!!!!!!!!!!!!!")
+				s.IsSubscribe = true
+				_, err = s.pluginRunner.executePlugin(plg.Name(), plg.Details)
 				if err != nil {
 					serrs = append(serrs, serror.New(err))
 					return serrs
 				}
+				log.Debug("i am here")
 			}
 		}
 

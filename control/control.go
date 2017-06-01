@@ -115,7 +115,7 @@ type runsPlugins interface {
 	SetMetricCatalog(catalogsMetrics)
 	SetPluginManager(managesPlugins)
 	Monitor() *monitor
-	executePlugin(string, *pluginDetails) error
+	executePlugin(string, *pluginDetails) (*availablePlugin, error)
 }
 
 type managesPlugins interface {
