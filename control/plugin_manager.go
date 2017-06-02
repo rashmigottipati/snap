@@ -179,6 +179,7 @@ type pluginDetails struct {
 	CACertPaths string
 	TLSEnabled  bool
 	Uri         *url.URL
+	Subscribe   bool
 }
 
 type loadedPlugin struct {
@@ -267,7 +268,7 @@ func newPluginManager(opts ...pluginManagerOpt) *pluginManager {
 		logPath:           logPath,
 		pluginConfig:      newPluginConfig(),
 		pluginTags:        newPluginTags(),
-		subscriptiongrp:   newsubscriptionGroup(),
+		subscriptiongrp:   newsubscriptionGroup(false),
 	}
 	mergedOpts := append([]pluginManagerOpt{}, defaultManagerOpts...)
 	mergedOpts = append(mergedOpts, opts...)
@@ -321,6 +322,14 @@ func optDefaultManagerSecurity() pluginManagerOpt {
 	}
 }
 
+// func (p *pluginManager) IsSubscribe() bool {
+// 	return p.subscriptiongrp.IsSubscribe()
+// }
+
+// func (p *pluginManager) SetIsSubscribe(ss bool) {
+// 	// p.subscriptiongrp.SetIsSubscribe(ss)
+// }
+
 // SetPluginLoadTimeout sets plugin load timeout
 func (p *pluginManager) SetPluginLoadTimeout(to int) {
 	p.pluginLoadTimeout = to
@@ -369,7 +378,8 @@ func (p *pluginManager) LoadPlugin(details *pluginDetails, emitter gomit.Emitter
 				"_block": "load-plugin",
 				"path":   filepath.Base(lPlugin.Details.Exec[0]),
 			}).Info("plugin load called")
-			ap, err = p.runPlugin(details, emitter)
+			//ap, err = p.runPlugin(details, emitter)
+			ap, err = p.runPlugin(details, emitter, runPluginFromLoad(details, resp))
 			if err != nil {
 				pmLogger.WithFields(log.Fields{
 					"_block": "load-plugin",
@@ -766,7 +776,33 @@ func (p *pluginManager) AddStandardAndWorkflowTags(m core.Metric, allTags map[st
 	return metric
 }
 
-func (p *pluginManager) runPlugin(details *pluginDetails, emitter gomit.Emitter, name ...string) (*availablePlugin, error) {
+func (p *pluginManager) runPluginFromLoad(details *pluginDetails, emitter gomit.Emitter, name ...string) (*availablePlugin, error) {
+	myfunc := func(p *pluginManager, resp plugin.Response) (*availablePlugin, error) {
+		key := fmt.Sprintf("%s"+core.Separator+"%s"+core.Separator+"%d", resp.Meta.Type.String(), resp.Meta.Name, resp.Meta.Version)
+		if _, exists := p.loadedPlugins.table[key]; exists {
+			return nil, serror.New(ErrPluginAlreadyLoaded, map[string]interface{}{
+				"plugin-name":    resp.Meta.Name,
+				"plugin-version": resp.Meta.Version,
+				"plugin-type":    resp.Type.String(),
+			})
+		}
+		return nil, nil
+	}
+	return p.runPlugin(details, emitter, myfunc, name...)
+}
+
+func (p *pluginManager) runPluginFromSubscriptionGroup(details *pluginDetails, emitter gomit.Emitter, name ...string) (*availablePlugin, error) {
+	myfunc := func(p *pluginManager, resp plugin.Response) (*availablePlugin, error) {
+		return nil, nil
+	}
+	return p.runPlugin(details, emitter, myfunc, name...)
+}
+
+func (p *pluginManager) runPlugin(
+	details *pluginDetails,
+	emitter gomit.Emitter,
+	myfunc func(p *pluginManager, resp plugin.Response) (*availablePlugin, error),
+	name ...string) (*availablePlugin, error) {
 	// We will create commands by appending the ExecPath to the actual command.
 	// The ExecPath is a temporary location where the plugin/package will be
 	// run from.
@@ -824,17 +860,21 @@ func (p *pluginManager) runPlugin(details *pluginDetails, emitter gomit.Emitter,
 	} else {
 		ePlugin.SetName(name[0])
 	}
-	log.Debugf("flag is set to %+v", p.subscriptiongrp.IsSubscribe)
-	if !p.subscriptiongrp.IsSubscribe {
-		//log.Debugf("flag is set to %+v", p.subscriptiongrp.IsSubscribe)
-		key := fmt.Sprintf("%s"+core.Separator+"%s"+core.Separator+"%d", resp.Meta.Type.String(), resp.Meta.Name, resp.Meta.Version)
-		if _, exists := p.loadedPlugins.table[key]; exists {
-			return nil, serror.New(ErrPluginAlreadyLoaded, map[string]interface{}{
-				"plugin-name":    resp.Meta.Name,
-				"plugin-version": resp.Meta.Version,
-				"plugin-type":    resp.Type.String(),
-			})
-		}
+	log.Debugf("flag is set to %+v", p.subscriptiongrp.getSubscribe())
+	//if !p.subscriptiongrp.IsSubscribe {
+	// if !details.Signed
+	// if !p.subscriptiongrp.getSubscribe() {
+	// 	key := fmt.Sprintf("%s"+core.Separator+"%s"+core.Separator+"%d", resp.Meta.Type.String(), resp.Meta.Name, resp.Meta.Version)
+	// 	if _, exists := p.loadedPlugins.table[key]; exists {
+	// 		return nil, serror.New(ErrPluginAlreadyLoaded, map[string]interface{}{
+	// 			"plugin-name":    resp.Meta.Name,
+	// 			"plugin-version": resp.Meta.Version,
+	// 			"plugin-type":    resp.Type.String(),
+	// 		})
+	// 	}
+	// }
+	if _, err := myfunc(p, resp); err != nil {
+		return nil, err
 	}
 
 	// build availablePlugin

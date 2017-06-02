@@ -123,7 +123,7 @@ type managesPlugins interface {
 	get(string) (*loadedPlugin, error)
 	all() map[string]*loadedPlugin
 	LoadPlugin(*pluginDetails, gomit.Emitter) (*loadedPlugin, serror.SnapError)
-	runPlugin(*pluginDetails, gomit.Emitter, ...string) (*availablePlugin, error)
+	runPlugin(*pluginDetails, gomit.Emitter, func(*pluginManager, plugin.Response) (*availablePlugin, error), ...string) (*availablePlugin, error)
 	UnloadPlugin(core.Plugin) (*loadedPlugin, serror.SnapError)
 	SetMetricCatalog(catalogsMetrics)
 	GenerateArgs(logLevel int) plugin.Arg

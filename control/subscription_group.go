@@ -81,13 +81,11 @@ type subscriptionGroup struct {
 	// and when plugins are loaded/unloaded
 	errors []serror.SnapError
 
-	IsSubscribe bool
+	subscribe bool
 }
 
-func newsubscriptionGroup() *subscriptionGroup {
-	return &subscriptionGroup{
-		IsSubscribe: false,
-	}
+func newsubscriptionGroup(sg bool) *subscriptionGroup {
+	return &subscriptionGroup{subscribe: sg}
 }
 
 type subscriptionMap map[string]*subscriptionGroup
@@ -106,13 +104,15 @@ func newSubscriptionGroups(control *pluginControl) *subscriptionGroups {
 	}
 }
 
-// func (s *subscriptionGroup) IsSubscribe() bool {
-// 	return s.IsSubscribe
-// }
+func (s *subscriptionGroup) getSubscribe() bool {
+	return s.subscribe
 
-// func (s *subscriptionGroup) SetIsSubscribe(IsSubscribe bool) {
-// 	s.IsSubscribe = IsSubscribe
-// }
+}
+
+func (s *subscriptionGroup) setSubscribe(IsSubscribe bool) {
+	s.subscribe = IsSubscribe
+
+}
 
 // Add adds a subscription group provided a subscription group id, requested
 // metrics, config tree and plugins. The requested metrics are mapped to
@@ -477,7 +477,11 @@ func (s *subscriptionGroup) subscribePlugins(id string,
 					return serrs
 				}
 				log.Debug("!!!!!!!!!!!!!!!!!!!!")
-				s.IsSubscribe = true
+
+				s.setSubscribe(true)
+				log.Debug("1)) flag value is set to %+v", s.getSubscribe())
+				//log.Debug("2)) flag value is set to %+v", s.pluginManager.IsSubscribe())
+				//plg.IsSigned = true
 				_, err = s.pluginRunner.executePlugin(plg.Name(), plg.Details)
 				if err != nil {
 					serrs = append(serrs, serror.New(err))

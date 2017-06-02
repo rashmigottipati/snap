@@ -303,7 +303,6 @@ func (r *runner) executePlugin(name string, details *pluginDetails) (*availableP
 		"_block":                "run-plugin",
 		"available-plugin":      ap.String(),
 		"available-plugin-type": ap.TypeName(),
-		"available-plugin-key":  ap.key,
 	}).Info("available plugin started")
 
 	defer r.emitter.Emit(&control_event.StartPluginEvent{
