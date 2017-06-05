@@ -374,7 +374,7 @@ func (s *scheduler) createTask(sch schedule.Schedule, wfMap *wmap.WorkflowMap, s
 			subscribedPluginAsserts = append(subscribedPluginAsserts, func(plugins []core.SubscribedPlugin) serror.SnapError {
 				if len(plugins) > 1 {
 					return serror.New(
-						ErrPluginIncompatibleWithScheduleType,
+						ErrMultipleStreamingPlugins,
 						map[string]interface{}{
 							"schedule_type":     fmt.Sprintf("%T", sch),
 							"num_of_collectors": len(plugins),

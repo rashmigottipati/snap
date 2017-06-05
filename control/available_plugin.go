@@ -293,7 +293,10 @@ func (a *availablePlugin) Kill(r string) error {
 		c.Killed()
 	}
 
-	return a.ePlugin.Kill()
+	if a.ePlugin != nil {
+		return a.ePlugin.Kill()
+	}
+	return nil
 }
 
 // CheckHealth checks the health of a plugin and updates
