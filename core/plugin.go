@@ -35,6 +35,7 @@ import (
 	"github.com/asaskevich/govalidator"
 	"github.com/intelsdi-x/snap/control/plugin/cpolicy"
 	"github.com/intelsdi-x/snap/core/cdata"
+	"github.com/intelsdi-x/snap/core/serror"
 	"github.com/intelsdi-x/snap/pkg/fileutils"
 )
 
@@ -128,6 +129,8 @@ type SubscribedPlugin interface {
 	Plugin
 	Config() *cdata.ConfigDataNode
 }
+
+type SubscribedPluginAssert func(plugins []SubscribedPlugin) serror.SnapError
 
 type RequestedPlugin struct {
 	path        string
