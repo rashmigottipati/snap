@@ -548,7 +548,6 @@ func (p *pluginManager) LoadPlugin(details *pluginDetails, emitter gomit.Emitter
 					"error":          err.Error(),
 					"plugin-name":    ap.Name(),
 					"plugin-version": ap.Version(),
-					"plugin-id":      ap.ID(),
 				}).Error("error in getting metric types")
 				resultChan <- result{nil, serror.New(err)}
 				return
