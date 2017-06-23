@@ -48,7 +48,7 @@ import:
   - trace
   - http2
 - package: google.golang.org/grpc
-  version: 0032a855ba5c8a3c8e0d71c2deef354b70af1584
+  version: 834dbd54e05e578c44aa018d5fab8d17892f9d4d
 - package: gopkg.in/yaml.v2
   version: c1cd2254a6dd314c9d73c338c12688c9325d85c6
 - package: github.com/intelsdi-x/snap-plugin-lib-go
